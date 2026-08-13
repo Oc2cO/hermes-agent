@@ -1434,10 +1434,12 @@ def _git_repo_root() -> Optional[str]:
     mistakes.
     """
     import subprocess
+    from hermes_cli._subprocess_compat import windows_hide_flags
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5,
+            creationflags=windows_hide_flags(),
         )
         if result.returncode == 0:
             return _normalize_git_bash_path(result.stdout.strip())
@@ -1498,7 +1500,7 @@ def _resolve_worktree_base(
     """
     import subprocess
 
-    from hermes_cli._subprocess_compat import noninteractive_git_env
+    from hermes_cli._subprocess_compat import noninteractive_git_env, windows_hide_flags
 
     def _git(args, timeout: float = 20):
         return subprocess.run(
@@ -1506,6 +1508,7 @@ def _resolve_worktree_base(
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, cwd=repo_root,
             stdin=subprocess.DEVNULL,
             env=noninteractive_git_env(),
+            creationflags=windows_hide_flags(),
         )
 
     def _ref_exists(ref: str) -> bool:
@@ -1607,6 +1610,8 @@ def _setup_worktree(repo_root: str = None, sync_base: bool = True) -> Optional[D
     """
     import subprocess
 
+    from hermes_cli._subprocess_compat import windows_hide_flags
+
     repo_root = repo_root or _git_repo_root()
     if not repo_root:
         print("\033[31m✗ --worktree requires being inside a git repository.\033[0m")
@@ -1664,6 +1669,7 @@ def _setup_worktree(repo_root: str = None, sync_base: bool = True) -> Optional[D
         result = subprocess.run(
             ["git", *_wt_add_cfg, "worktree", "add", str(wt_path), "-b", branch_name, base_ref],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30, cwd=repo_root,
+            creationflags=windows_hide_flags(),
         )
         if result.returncode != 0:
             # If branching from the resolved remote ref failed for any reason
@@ -1678,6 +1684,7 @@ def _setup_worktree(repo_root: str = None, sync_base: bool = True) -> Optional[D
                 result = subprocess.run(
                     ["git", "worktree", "add", str(wt_path), "-b", branch_name, base_ref],
                     capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30, cwd=repo_root,
+                    creationflags=windows_hide_flags(),
                 )
             if result.returncode != 0:
                 print(f"\033[31m✗ Failed to create worktree: {result.stderr.strip()}\033[0m")
@@ -1766,6 +1773,7 @@ def _setup_worktree(repo_root: str = None, sync_base: bool = True) -> Optional[D
         subprocess.run(
             ["git", "worktree", "lock", "--reason", f"hermes pid={os.getpid()}", str(wt_path)],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10, cwd=repo_root,
+            creationflags=windows_hide_flags(),
         )
         logger.debug("Worktree locked: %s (pid=%s)", wt_path, os.getpid())
     except Exception as e:
@@ -1795,10 +1803,13 @@ def _worktree_has_unpushed_commits(worktree_path: str, timeout: int = 10) -> boo
     """
     import subprocess
 
+    from hermes_cli._subprocess_compat import windows_hide_flags
+
     try:
         remote_refs = subprocess.run(
             ["git", "for-each-ref", "--format=%(refname)", "refs/remotes"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, cwd=worktree_path,
+            creationflags=windows_hide_flags(),
         )
         if remote_refs.returncode != 0:
             return True
@@ -1808,6 +1819,7 @@ def _worktree_has_unpushed_commits(worktree_path: str, timeout: int = 10) -> boo
         result = subprocess.run(
             ["git", "log", "--oneline", "HEAD", "--not", "--remotes"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, cwd=worktree_path,
+            creationflags=windows_hide_flags(),
         )
         if result.returncode != 0:
             return True
@@ -1825,10 +1837,13 @@ def _worktree_is_dirty(worktree_path: str, timeout: int = 10) -> bool:
     """
     import subprocess
 
+    from hermes_cli._subprocess_compat import windows_hide_flags
+
     try:
         result = subprocess.run(
             ["git", "status", "--porcelain"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, cwd=worktree_path,
+            creationflags=windows_hide_flags(),
         )
         if result.returncode != 0:
             return True
@@ -1925,12 +1940,15 @@ def _worktree_commits_all_merged_upstream(
     """
     import subprocess
 
+    from hermes_cli._subprocess_compat import windows_hide_flags
+
     base = None
     for candidate in ("origin/HEAD", "origin/main", "origin/master"):
         try:
             probe = subprocess.run(
                 ["git", "rev-parse", "--verify", "--quiet", candidate],
                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, cwd=worktree_path,
+                creationflags=windows_hide_flags(),
             )
             if probe.returncode == 0 and probe.stdout.strip():
                 base = candidate
@@ -1949,6 +1967,7 @@ def _worktree_commits_all_merged_upstream(
             revs = subprocess.run(
                 ["git", "rev-parse", f"{base}^{{commit}}", "HEAD^{commit}"],
                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, cwd=worktree_path,
+                creationflags=windows_hide_flags(),
             )
             if revs.returncode == 0:
                 shas = revs.stdout.split()
@@ -1965,6 +1984,7 @@ def _worktree_commits_all_merged_upstream(
         ahead = subprocess.run(
             ["git", "rev-list", "--count", f"{base}..HEAD"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, cwd=worktree_path,
+            creationflags=windows_hide_flags(),
         )
         if ahead.returncode != 0:
             return False
@@ -1977,6 +1997,7 @@ def _worktree_commits_all_merged_upstream(
         cherry = subprocess.run(
             ["git", "cherry", base, "HEAD"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, cwd=worktree_path,
+            creationflags=windows_hide_flags(),
         )
         if cherry.returncode != 0:
             return False
@@ -2008,10 +2029,13 @@ def _worktree_lock_is_live(repo_root: str, worktree_path: str, timeout: int = 10
     import re
     import subprocess
 
+    from hermes_cli._subprocess_compat import windows_hide_flags
+
     try:
         result = subprocess.run(
             ["git", "worktree", "list", "--porcelain"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, cwd=repo_root,
+            creationflags=windows_hide_flags(),
         )
         if result.returncode != 0:
             return "live"
@@ -2064,6 +2088,8 @@ def _cleanup_worktree(info: Dict[str, str] = None) -> None:
 
     import subprocess
 
+    from hermes_cli._subprocess_compat import windows_hide_flags
+
     wt_path = info["path"]
     branch = info["branch"]
     repo_root = info["repo_root"]
@@ -2087,6 +2113,7 @@ def _cleanup_worktree(info: Dict[str, str] = None) -> None:
         subprocess.run(
             ["git", "worktree", "unlock", wt_path],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10, cwd=repo_root,
+            creationflags=windows_hide_flags(),
         )
     except Exception as e:
         logger.debug("git worktree unlock failed (non-fatal): %s", e)
@@ -2095,6 +2122,7 @@ def _cleanup_worktree(info: Dict[str, str] = None) -> None:
         subprocess.run(
             ["git", "worktree", "remove", wt_path, "--force"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15, cwd=repo_root,
+            creationflags=windows_hide_flags(),
         )
     except Exception as e:
         logger.debug("Failed to remove worktree: %s", e)
@@ -2104,6 +2132,7 @@ def _cleanup_worktree(info: Dict[str, str] = None) -> None:
         subprocess.run(
             ["git", "branch", "-D", branch],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10, cwd=repo_root,
+            creationflags=windows_hide_flags(),
         )
     except Exception as e:
         logger.debug("Failed to delete branch %s: %s", branch, e)
@@ -2263,6 +2292,8 @@ def _prune_stale_worktrees(repo_root: str, max_age_hours: int = 24) -> None:
     import subprocess
     import time
 
+    from hermes_cli._subprocess_compat import windows_hide_flags
+
     worktrees_dir = Path(repo_root) / ".worktrees"
     if not worktrees_dir.exists():
         _prune_orphaned_branches(repo_root)
@@ -2382,6 +2413,7 @@ def _prune_stale_worktrees(repo_root: str, max_age_hours: int = 24) -> None:
                 subprocess.run(
                     ["git", "worktree", "unlock", str(entry)],
                     capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10, cwd=repo_root,
+                    creationflags=windows_hide_flags(),
                 )
             except Exception as e:
                 logger.debug("Failed to unlock dead worktree %s: %s", entry.name, e)
@@ -2391,12 +2423,14 @@ def _prune_stale_worktrees(repo_root: str, max_age_hours: int = 24) -> None:
             branch_result = subprocess.run(
                 ["git", "branch", "--show-current"],
                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5, cwd=str(entry),
+                creationflags=windows_hide_flags(),
             )
             branch = branch_result.stdout.strip()
 
             remove_result = subprocess.run(
                 ["git", "worktree", "remove", str(entry), "--force"],
                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15, cwd=repo_root,
+                creationflags=windows_hide_flags(),
             )
             if remove_result.returncode != 0:
                 # Removal failed — keep the branch so any commits stay
@@ -2410,6 +2444,7 @@ def _prune_stale_worktrees(repo_root: str, max_age_hours: int = 24) -> None:
                 subprocess.run(
                     ["git", "branch", "-D", branch],
                     capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10, cwd=repo_root,
+                    creationflags=windows_hide_flags(),
                 )
             logger.debug("Pruned stale worktree: %s (force=%s)", entry.name, force)
         except Exception as e:
@@ -2434,10 +2469,13 @@ def _prune_orphaned_branches(repo_root: str) -> None:
     """
     import subprocess
 
+    from hermes_cli._subprocess_compat import windows_hide_flags
+
     try:
         result = subprocess.run(
             ["git", "branch", "--format=%(refname:short)"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10, cwd=repo_root,
+            creationflags=windows_hide_flags(),
         )
         if result.returncode != 0:
             return
@@ -2451,6 +2489,7 @@ def _prune_orphaned_branches(repo_root: str) -> None:
         wt_result = subprocess.run(
             ["git", "worktree", "list", "--porcelain"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10, cwd=repo_root,
+            creationflags=windows_hide_flags(),
         )
         for line in wt_result.stdout.split("\n"):
             if line.startswith("branch refs/heads/"):
@@ -2463,6 +2502,7 @@ def _prune_orphaned_branches(repo_root: str) -> None:
         head_result = subprocess.run(
             ["git", "branch", "--show-current"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5, cwd=repo_root,
+            creationflags=windows_hide_flags(),
         )
         current = head_result.stdout.strip()
         if current:
@@ -2487,6 +2527,7 @@ def _prune_orphaned_branches(repo_root: str) -> None:
             subprocess.run(
                 ["git", "branch", "-D"] + batch,
                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30, cwd=repo_root,
+                creationflags=windows_hide_flags(),
             )
         except Exception as e:
             logger.debug("Failed to prune orphaned branches: %s", e)

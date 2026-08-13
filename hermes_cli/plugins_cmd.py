@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from hermes_constants import get_hermes_home
-from hermes_cli._subprocess_compat import noninteractive_git_env
+from hermes_cli._subprocess_compat import noninteractive_git_env, windows_hide_flags
 from hermes_cli.config import cfg_get
 from hermes_cli.secret_prompt import masked_secret_prompt
 from utils import atomic_write_text
@@ -522,6 +522,7 @@ def _git_head_revision(repo: Path, git_exe: str) -> str:
         timeout=15,
         stdin=subprocess.DEVNULL,
         env=noninteractive_git_env(),
+        creationflags=windows_hide_flags(),
     )
     if result.returncode != 0:
         err = _safe_git_error(result)
@@ -542,6 +543,7 @@ def _checkout_exact_revision(repo: Path, git_exe: str, revision: str) -> None:
             timeout=60,
             stdin=subprocess.DEVNULL,
             env=noninteractive_git_env(),
+            creationflags=windows_hide_flags(),
         )
     except subprocess.TimeoutExpired as exc:
         raise PluginOperationError(
@@ -563,6 +565,7 @@ def _checkout_exact_revision(repo: Path, git_exe: str, revision: str) -> None:
             timeout=60,
             stdin=subprocess.DEVNULL,
             env=noninteractive_git_env(),
+            creationflags=windows_hide_flags(),
         )
     except subprocess.TimeoutExpired as exc:
         raise PluginOperationError(
@@ -613,6 +616,7 @@ def _scrub_cloned_origin(repo: Path, git_exe: str, git_url: str) -> None:
         timeout=15,
         stdin=subprocess.DEVNULL,
         env=noninteractive_git_env(),
+        creationflags=windows_hide_flags(),
     )
     if result.returncode != 0:
         err = _safe_git_error(result, git_url)
@@ -664,6 +668,7 @@ def _install_plugin_core(
                 timeout=60,
                 stdin=subprocess.DEVNULL,
                 env=noninteractive_git_env(),
+                creationflags=windows_hide_flags(),
             )
         except FileNotFoundError as e:
             raise PluginOperationError("git is not installed or not in PATH.") from e
@@ -2382,6 +2387,7 @@ def _git_pull_plugin_dir(target: Path) -> tuple[bool, str]:
             cwd=str(target),
             stdin=subprocess.DEVNULL,
             env=noninteractive_git_env(),
+            creationflags=windows_hide_flags(),
         )
     except FileNotFoundError:
         return False, "git is not installed or not in PATH."
