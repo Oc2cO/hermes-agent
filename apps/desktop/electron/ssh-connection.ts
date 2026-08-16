@@ -359,7 +359,11 @@ function runSsh(args, { timeoutMs, spawnFn = spawn, stdin = 'ignore', stdinData 
     let child
 
     try {
-      child = spawnFn('ssh', args, hiddenWindowsChildOptions({ stdio: [useStdinPipe ? 'pipe' : 'ignore', 'pipe', 'pipe'] }))
+      child = spawnFn(
+        'ssh',
+        args,
+        hiddenWindowsChildOptions({ stdio: [useStdinPipe ? 'pipe' : 'ignore', 'pipe', 'pipe'] })
+      )
     } catch (error) {
       reject(error)
 

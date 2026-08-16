@@ -2995,7 +2995,8 @@ async function processStartMarker(pid) {
     const ticks = await execText('powershell.exe', [
       '-NoProfile',
       '-NonInteractive',
-      '-WindowStyle', 'Hidden',
+      '-WindowStyle',
+      'Hidden',
       '-Command',
       `$p = Get-Process -Id ${pid} -ErrorAction Stop; $p.StartTime.ToUniversalTime().Ticks`
     ])
@@ -11209,9 +11210,11 @@ function createWindow() {
   let lastTitleBarRepaint = 0
   mainWindow.on('focus', () => {
     const now = Date.now()
+
     if (now - lastTitleBarRepaint < 1000) {
       return
     }
+
     lastTitleBarRepaint = now
     applyTitleBarOverlay(mainWindow)
   })
