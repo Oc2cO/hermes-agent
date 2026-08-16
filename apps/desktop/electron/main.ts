@@ -2988,9 +2988,14 @@ async function processStartMarker(pid) {
   }
 
   if (IS_WINDOWS) {
+    // -WindowStyle Hidden is redundant with execText's windowsHide:true, but
+    // windowsHide alone is not always reliable for `powershell.exe -Command`
+    // specifically (a known Node/Windows quirk) -- belt-and-suspenders since
+    // this fires up to 3x in rapid succession during every desktop startup.
     const ticks = await execText('powershell.exe', [
       '-NoProfile',
       '-NonInteractive',
+      '-WindowStyle', 'Hidden',
       '-Command',
       `$p = Get-Process -Id ${pid} -ErrorAction Stop; $p.StartTime.ToUniversalTime().Ticks`
     ])
@@ -11183,6 +11188,33 @@ function createWindow() {
   mainWindow.on('restore', () => sendWindowStateChanged())
   mainWindow.on('hide', () => sendWindowStateChanged())
   mainWindow.on('show', () => sendWindowStateChanged())
+
+  // Windows: a frameless window with titleBarOverlay can repaint its
+  // Windows-Control-Overlay region with the raw native (unstyled black)
+  // frame for one compositor frame when DWM redraws on WM_ACTIVATE --
+  // most visible when refocusing an already-open window (taskbar click,
+  // alt-tab), not just on first show. Re-pushing the overlay options on
+  // focus forces Chromium to redraw that strip with the correct themed
+  // colors immediately instead of leaving the stale native frame visible.
+  // applyTitleBarOverlay already no-ops safely on platforms/builds where
+  // this isn't applicable.
+  //
+  // Debounced: Electron fires 'focus' multiple times during a window's own
+  // startup/show sequence (creation, internal focus transitions between
+  // helper windows), not just on later refocus. Without debouncing, this
+  // handler repainted the titlebar strip 3-4x in a burst right at launch --
+  // more visible flicker than the bug it was meant to fix. Collapsing to
+  // at most one repaint per second keeps the later-refocus fix intact
+  // while eliminating the launch-time burst.
+  let lastTitleBarRepaint = 0
+  mainWindow.on('focus', () => {
+    const now = Date.now()
+    if (now - lastTitleBarRepaint < 1000) {
+      return
+    }
+    lastTitleBarRepaint = now
+    applyTitleBarOverlay(mainWindow)
+  })
 
   // Reopen where the user left off. close is the backstop, flushed
   // synchronously before the window is gone.
